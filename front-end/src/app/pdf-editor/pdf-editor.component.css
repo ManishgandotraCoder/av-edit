@@ -685,16 +685,10 @@
   align-content: start;
   overflow: auto;
   border: 0;
-  border-radius: 0 0 0 0;
+  border-radius: 0;
   background: #fff;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.16);
-}
-
-.widget__tableRow {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(72px, 1fr);
-  gap: 0;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+  grid-auto-rows: 32px;
 }
 
 .widget__cell {
@@ -704,19 +698,60 @@
   border: 0;
   border-right: 1px solid rgba(15, 23, 42, 0.14);
   border-bottom: 1px solid rgba(15, 23, 42, 0.14);
-  background: #fafbfc;
+  background: #ffffff;
   padding: 0 10px;
   outline: none;
   font: 500 13px/1.25 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI";
   color: rgba(15, 23, 42, 0.9);
 }
 
-.widget__tableRow .widget__cell:last-child {
-  border-right: 0;
+.widget__cell:focus {
+  position: relative;
+  z-index: 2;
+  box-shadow:
+    inset 0 0 0 2px rgba(59, 130, 246, 0.9),
+    0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
-.widget__tableGrid .widget__tableRow:last-child .widget__cell {
-  border-bottom: 0;
+.widget__table.isReadonly .widget__cell {
+  background: #fbfcfe;
+  color: rgba(15, 23, 42, 0.78);
+  cursor: default;
+}
+
+.widget__table.isReadonly .widget__cell:focus {
+  box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.22);
+}
+
+.widget__cellHeader {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  border-right: 1px solid rgba(15, 23, 42, 0.14);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.14);
+  background: linear-gradient(#f8fafc, #f1f5f9);
+  font: 800 12px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI";
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.widget__cellHeader--corner {
+  background: linear-gradient(#f1f5f9, #e2e8f0);
+}
+
+.widget__cellHeader--row {
+  justify-content: flex-end;
+  padding-right: 8px;
+}
+
+.widget__cellHeader--col {
+  justify-content: center;
+}
+
+.widget__tableGrid > :nth-child(1),
+.widget__tableGrid > :nth-child(n) {
+  /* rely on grid; keep selectors stable for future tweaks */
 }
 
 .widget__tableActions {

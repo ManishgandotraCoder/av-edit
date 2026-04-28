@@ -809,8 +809,10 @@ export class PdfEditorComponent implements AfterViewInit {
     }
     if (kind === 'table') {
       queueMicrotask(() => {
-        const el = document.querySelector<HTMLElement>(`[data-widget-id="${id}"] .widget__cell`);
-        (el as HTMLInputElement | null)?.focus?.();
+        const el = document.querySelector<HTMLInputElement>(
+          `[data-widget-id="${id}"] .widget__cell[data-r="0"][data-c="0"]`
+        );
+        el?.focus?.();
       });
     }
 
@@ -863,6 +865,24 @@ export class PdfEditorComponent implements AfterViewInit {
     return w.table?.cells?.[r]?.[c] ?? '';
   }
 
+  protected tableGridTemplateColumns(w: Widget) {
+    const cols = Math.max(0, w.table?.cols ?? 0);
+    // Excel-like grid: first column is row numbers.
+    return `36px repeat(${cols}, minmax(72px, 1fr))`;
+  }
+
+  protected tableColLabel(c: number) {
+    // 0 -> A, 25 -> Z, 26 -> AA ...
+    let n = Math.max(0, Math.floor(c));
+    let s = '';
+    while (true) {
+      s = String.fromCharCode(65 + (n % 26)) + s;
+      n = Math.floor(n / 26) - 1;
+      if (n < 0) break;
+    }
+    return s;
+  }
+
   protected updateTableCell(pageIndex: number, widgetId: string, r: number, c: number, value: string) {
     this.updateWidget(pageIndex, widgetId, (w) => {
       const t = w.table;
@@ -877,6 +897,44 @@ export class PdfEditorComponent implements AfterViewInit {
   protected onTableCellInput(pageIndex: number, widgetId: string, r: number, c: number, ev: Event) {
     const value = (ev.target as HTMLInputElement | null)?.value ?? '';
     this.updateTableCell(pageIndex, widgetId, r, c, value);
+  }
+
+  protected onTableCellKeydown(
+    pageIndex: number,
+    widgetId: string,
+    r: number,
+    c: number,
+    ev: KeyboardEvent
+  ) {
+    const k = ev.key;
+    const dir =
+      k === 'ArrowRight'
+        ? { dr: 0, dc: 1 }
+        : k === 'ArrowLeft'
+          ? { dr: 0, dc: -1 }
+          : k === 'ArrowDown'
+            ? { dr: 1, dc: 0 }
+            : k === 'ArrowUp'
+              ? { dr: -1, dc: 0 }
+              : k === 'Enter'
+                ? { dr: 1, dc: 0 }
+                : null;
+
+    if (!dir) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    const w = (this.widgetsByPage()[pageIndex] ?? []).find((x) => x.id === widgetId);
+    const rows = Math.max(0, w?.table?.rows ?? 0);
+    const cols = Math.max(0, w?.table?.cols ?? 0);
+    const nr = clamp(r + dir.dr, 0, Math.max(0, rows - 1));
+    const nc = clamp(c + dir.dc, 0, Math.max(0, cols - 1));
+
+    const input = document.querySelector<HTMLInputElement>(
+      `[data-widget-id="${widgetId}"] .widget__cell[data-r="${nr}"][data-c="${nc}"]`
+    );
+    input?.focus?.();
+    input?.select?.();
   }
 
   protected addTableRow(pageIndex: number, widgetId: string) {

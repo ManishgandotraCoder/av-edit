@@ -70,9 +70,6 @@
     <div class="docsRow docsRow--menu">
       <div class="docsLeft">
         <div class="docsMenus" aria-label="Menus">
-          <button class="docsMenuBtn" type="button" (click)="closeDocsMenu()">File</button>
-          <button class="docsMenuBtn" type="button" (click)="closeDocsMenu()">Edit</button>
-          <button class="docsMenuBtn" type="button" (click)="closeDocsMenu()">View</button>
 
           <div class="docsMenuWrap">
             <button
@@ -93,16 +90,7 @@
                   (click)="pickPdfImageFromMenu($event)"
                   [disabled]="pageCount() === 0 || isLoading()"
                 >
-                  Image…
-                </button>
-                <button
-                  class="docsMenuItem"
-                  type="button"
-                  role="menuitem"
-                  (click)="onInsertFromMenu('text', $event)"
-                  [disabled]="pageCount() === 0 || isLoading()"
-                >
-                  Text box
+                  Image
                 </button>
                 <button
                   class="docsMenuItem"
@@ -117,28 +105,14 @@
                   class="docsMenuItem"
                   type="button"
                   role="menuitem"
-                  (click)="onInsertFromMenu('signature', $event)"
-                  [disabled]="pageCount() === 0 || isLoading()"
-                >
-                  Signature…
-                </button>
-                <button
-                  class="docsMenuItem"
-                  type="button"
-                  role="menuitem"
                   (click)="onInsertFromMenu('video', $event)"
                   [disabled]="pageCount() === 0 || isLoading()"
                 >
-                  Video…
+                  Video
                 </button>
               </div>
             }
           </div>
-
-          <button class="docsMenuBtn" type="button" (click)="closeDocsMenu()">Format</button>
-          <button class="docsMenuBtn" type="button" (click)="closeDocsMenu()">Tools</button>
-          <button class="docsMenuBtn" type="button" (click)="closeDocsMenu()">Extensions</button>
-          <button class="docsMenuBtn" type="button" (click)="closeDocsMenu()">Help</button>
         </div>
       </div>
       <div class="docsRight"></div>
@@ -485,33 +459,51 @@
                       <div class="widget__content">
                         @switch (w.kind) {
                           @case ('table') {
-                            @if (editingWidgetId() === w.id) {
-                              <div class="widget__table" (pointerdown)="$event.stopPropagation()">
-                                <div class="widget__tableGrid">
-                                  @for (r of range(w.table?.rows ?? 0); track r) {
-                                    <div class="widget__tableRow">
-                                      @for (c of range(w.table?.cols ?? 0); track c) {
-                                        <input
-                                          class="widget__cell widget__editor"
-                                          [value]="tableCellValue(w, r, c)"
-                                          (input)="onTableCellInput(activePageIndex(), w.id, r, c, $event)"
-                                          (keydown.escape)="stopEditingWidget(w.id)"
-                                        />
-                                      }
-                                    </div>
+                            <div
+                              class="widget__table"
+                              [class.isReadonly]="editingWidgetId() !== w.id"
+                              (pointerdown)="$event.stopPropagation()"
+                              (dblclick)="startEditingWidget(w.id, $event)"
+                            >
+                              <div
+                                class="widget__tableGrid"
+                                [style.grid-template-columns]="tableGridTemplateColumns(w)"
+                                (click)="editingWidgetId() !== w.id ? startEditingWidget(w.id, $event) : null"
+                              >
+                                <div class="widget__cellHeader widget__cellHeader--corner" aria-hidden="true"></div>
+                                @for (c of range(w.table?.cols ?? 0); track c) {
+                                  <div class="widget__cellHeader widget__cellHeader--col" aria-hidden="true">
+                                    {{ tableColLabel(c) }}
+                                  </div>
+                                }
+
+                                @for (r of range(w.table?.rows ?? 0); track r) {
+                                  <div class="widget__cellHeader widget__cellHeader--row" aria-hidden="true">
+                                    {{ r + 1 }}
+                                  </div>
+                                  @for (c of range(w.table?.cols ?? 0); track c) {
+                                    <input
+                                      class="widget__cell widget__editor"
+                                      [attr.data-r]="r"
+                                      [attr.data-c]="c"
+                                      [value]="tableCellValue(w, r, c)"
+                                      [readOnly]="editingWidgetId() !== w.id"
+                                      (input)="onTableCellInput(activePageIndex(), w.id, r, c, $event)"
+                                      (keydown)="onTableCellKeydown(activePageIndex(), w.id, r, c, $event)"
+                                      (keydown.escape)="stopEditingWidget(w.id)"
+                                    />
                                   }
-                                </div>
+                                }
+                              </div>
+
+                              @if (editingWidgetId() === w.id) {
                                 <div class="widget__tableActions">
                                   <button type="button" class="widget__miniBtn" (click)="addTableRow(activePageIndex(), w.id)">+ Row</button>
                                   <button type="button" class="widget__miniBtn" (click)="addTableCol(activePageIndex(), w.id)">+ Col</button>
                                   <button type="button" class="widget__miniBtn" (click)="stopEditingWidget(w.id)">Done</button>
                                 </div>
-                              </div>
-                            } @else {
-                              <button type="button" class="widget__labelBtn" (click)="startEditingWidget(w.id, $event)">
-                                Edit table
-                              </button>
-                            }
+                              }
+                            </div>
                           }
                           @case ('image') {
                             @if (w.imageSrc) {
