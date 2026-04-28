@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+import { idbDelete, idbGet, idbListAll, idbPut, type StoredPdfRow } from './pdf-storage.idb';
+
 export type PdfMeta = {
   id: string;
   name: string;
@@ -10,24 +12,7 @@ export type PdfMeta = {
 
 @Injectable({ providedIn: 'root' })
 export class PdfApiService {
-  private async readErrorMessage(res: Response): Promise<string | null> {
-    try {
-      const text = await res.text();
-      try {
-        const j = JSON.parse(text) as { error?: unknown };
-        const e = j?.error;
-        if (typeof e === 'string' && e.length > 0) return e;
-      } catch {
-        // ignore
-      }
-      const t = text.trim();
-      return t.length > 0 ? t : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private assertPdfBytes(bytes: Uint8Array) {
+  private assertValidPdf(bytes: Uint8Array) {
     if (bytes.byteLength < 5) {
       throw new Error('Empty PDF (no bytes).');
     }
@@ -35,72 +20,107 @@ export class PdfApiService {
     a.set(bytes.subarray(0, 5));
     const head = new TextDecoder('utf-8').decode(a);
     if (head !== '%PDF-') {
-      // Often happens when the server returns HTML/JSON and we try to parse it as PDF.
       if (a[0] === 0x3c) {
-        // '<'
-        throw new Error('Received HTML instead of a PDF. Check the dev server proxy to /api.');
+        throw new Error('Corrupt PDF in local library (HTML-looking data instead of PDF).');
       }
       throw new Error('Not a valid PDF (missing %PDF- header).');
     }
   }
 
+  private metaFromRow(row: StoredPdfRow): PdfMeta {
+    const { id, name, size, createdAt, updatedAt } = row;
+    return { id, name, size, createdAt, updatedAt };
+  }
+
+  private isLikelyPdfUpload(file: File): boolean {
+    const mt = String(file.type ?? '').toLowerCase();
+    if (mt === 'application/pdf') return true;
+    if (mt === 'application/octet-stream' || mt === 'binary/octet-stream') return true;
+    return false;
+  }
+
   async list(): Promise<PdfMeta[]> {
-    const res = await fetch('/api/pdfs');
-    if (!res.ok) {
-      const msg = (await this.readErrorMessage(res)) ?? 'Failed to load library.';
-      throw new Error(msg);
-    }
-    return (await res.json()) as PdfMeta[];
+    const rows = await idbListAll();
+    return rows
+      .map((row) => this.metaFromRow(row))
+      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   }
 
   async upload(file: File): Promise<PdfMeta> {
-    const fd = new FormData();
-    fd.set('file', file);
-    const res = await fetch('/api/pdfs', { method: 'POST', body: fd });
-    if (!res.ok) {
-      const msg = (await this.readErrorMessage(res)) ?? 'Upload failed.';
-      throw new Error(msg);
+    if (!this.isLikelyPdfUpload(file)) {
+      throw new Error('Only PDF upload supported (application/pdf or octet-stream).');
     }
-    return (await res.json()) as PdfMeta;
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    this.assertValidPdf(bytes);
+
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    const row: StoredPdfRow = {
+      id,
+      name: file.name ?? 'document.pdf',
+      size: bytes.byteLength,
+      createdAt: now,
+      updatedAt: now,
+      buffer
+    };
+
+    try {
+      await idbPut(row);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        throw new Error('Browser storage full. Delete some PDFs or free disk space.');
+      }
+      throw e;
+    }
+    return this.metaFromRow(row);
   }
 
   async getMeta(id: string): Promise<PdfMeta> {
-    const res = await fetch(`/api/pdfs/${encodeURIComponent(id)}/meta`);
-    if (!res.ok) throw new Error('Failed to load PDF meta.');
-    return (await res.json()) as PdfMeta;
+    const row = await idbGet(id);
+    if (!row) throw new Error('Not found.');
+    return this.metaFromRow(row);
   }
 
   async getBytes(id: string): Promise<Uint8Array> {
-    const res = await fetch(`/api/pdfs/${encodeURIComponent(id)}`);
-    if (!res.ok) {
-      const msg = (await this.readErrorMessage(res)) ?? 'Failed to load PDF.';
-      throw new Error(msg);
+    const row = await idbGet(id);
+    if (!row) {
+      throw new Error('PDF not found.');
     }
-    const buf = new Uint8Array(await res.arrayBuffer());
-    this.assertPdfBytes(buf);
+    const buf = new Uint8Array(row.buffer.byteLength);
+    buf.set(new Uint8Array(row.buffer));
+    this.assertValidPdf(buf);
     return buf;
   }
 
   async saveBytes(id: string, bytes: Uint8Array): Promise<PdfMeta> {
-    // Some TS DOM libs in Angular builds don't include Uint8Array/ArrayBufferLike as BodyInit,
-    // so send a Blob.
-    const safe = new Uint8Array(bytes.byteLength);
-    safe.set(bytes);
-    const body = new Blob([safe.buffer], { type: 'application/pdf' });
-    const res = await fetch(`/api/pdfs/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body
-    });
-    if (!res.ok) {
-      const msg = (await this.readErrorMessage(res)) ?? 'Failed to save PDF.';
-      throw new Error(msg);
+    this.assertValidPdf(bytes);
+    const prev = await idbGet(id);
+    if (!prev) throw new Error('Not found.');
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    const buffer = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength) as ArrayBuffer;
+    const now = Date.now();
+    const row: StoredPdfRow = {
+      ...prev,
+      buffer,
+      size: copy.byteLength,
+      updatedAt: now
+    };
+    try {
+      await idbPut(row);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        throw new Error('Browser storage full. Delete some PDFs or free disk space.');
+      }
+      throw e;
     }
-    return (await res.json()) as PdfMeta;
+    return this.metaFromRow(row);
   }
 
   async delete(id: string): Promise<void> {
-    const res = await fetch(`/api/pdfs/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete PDF.');
+    const prev = await idbGet(id);
+    if (!prev) throw new Error('Not found.');
+    await idbDelete(id);
   }
 }
-
