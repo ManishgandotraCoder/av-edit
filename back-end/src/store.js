@@ -1,8 +1,18 @@
 const fs = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const STORAGE_DIR = path.join(__dirname, '..', 'storage');
+/** Local dev: ./storage — Vercel: writable OS temp dir (instances are ephemeral). */
+const STORAGE_DIR = (() => {
+  if (process.env.STORAGE_PATH && process.env.STORAGE_PATH.trim()) {
+    return path.resolve(process.env.STORAGE_PATH);
+  }
+  if (process.env.VERCEL) {
+    return path.join(os.tmpdir(), 'avyro-editor-backend-storage');
+  }
+  return path.join(__dirname, '..', 'storage');
+})();
 const PDF_DIR = path.join(STORAGE_DIR, 'pdfs');
 const INDEX_PATH = path.join(STORAGE_DIR, 'index.json');
 

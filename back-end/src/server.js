@@ -109,9 +109,13 @@ app.delete('/api/pdfs/:id', async (req, res) => {
   }
 });
 
-const port = Number(process.env.PORT ?? 5050);
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`avyro-editor backend listening on http://localhost:${port}`);
-});
+module.exports = app;
+
+if (require.main === module) {
+  const port = Number(process.env.PORT ?? 5050);
+  app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`avyro-editor backend listening on http://localhost:${port}`);
+  });
+}
 
