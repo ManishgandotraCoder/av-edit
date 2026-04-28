@@ -937,6 +937,22 @@ export class PdfEditorComponent implements AfterViewInit {
     input?.select?.();
   }
 
+  protected onTableCellPointerDown(widgetId: string, r: number, c: number, ev: PointerEvent) {
+    // If we're not in edit mode, a readonly cell can still take focus but won't accept typing.
+    // Flip into edit mode and re-focus the clicked cell.
+    if (this.editingWidgetId() === widgetId) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.startEditingWidget(widgetId, ev);
+    queueMicrotask(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        `[data-widget-id="${widgetId}"] .widget__cell[data-r="${r}"][data-c="${c}"]`
+      );
+      input?.focus?.();
+      input?.select?.();
+    });
+  }
+
   protected addTableRow(pageIndex: number, widgetId: string) {
     this.updateWidget(pageIndex, widgetId, (w) => {
       const t = w.table;

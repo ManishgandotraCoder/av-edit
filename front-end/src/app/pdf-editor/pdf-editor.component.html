@@ -333,24 +333,6 @@
         </div>
 
         <div class="sidebar__scroll">
-          <div class="insertRow" aria-label="Insert">
-            <div
-              class="insertBtn"
-              role="button"
-              tabindex="0"
-              draggable="true"
-              title="Drag to place image"
-              (dragstart)="onPdfImageDragStart($event)"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="2"/>
-                <path d="M8 14l2-2 4 4 2-2 2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                <path d="M10 9a1.5 1.5 0 1 0 0 .01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              <div class="insertBtn__label">Image</div>
-            </div>
-          </div>
-
           <div class="sidebar__list">
             @for (pageIndex of pages(); track pageIndex) {
               <div
@@ -488,6 +470,7 @@
                                       [attr.data-c]="c"
                                       [value]="tableCellValue(w, r, c)"
                                       [readOnly]="editingWidgetId() !== w.id"
+                                      (pointerdown)="onTableCellPointerDown(w.id, r, c, $event)"
                                       (input)="onTableCellInput(activePageIndex(), w.id, r, c, $event)"
                                       (keydown)="onTableCellKeydown(activePageIndex(), w.id, r, c, $event)"
                                       (keydown.escape)="stopEditingWidget(w.id)"
