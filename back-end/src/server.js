@@ -9,6 +9,15 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors());
 
+app.get('/', (_req, res) =>
+  res.json({
+    ok: true,
+    name: 'avyro-editor-backend',
+    hint: 'Use GET /api/health to verify the deployment; do not reuse old preview hashes in the hostname.',
+    healthPath: '/api/health'
+  })
+);
+
 function isLikelyPdfUpload(file) {
   if (!file) return false;
   const mt = String(file.mimetype ?? '').toLowerCase();
